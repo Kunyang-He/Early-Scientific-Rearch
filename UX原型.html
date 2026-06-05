@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>向导 Agent — UX 原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    height: 100vh; display: flex; flex-direction: column;
+    background: #f0f0f0; color: #1a1a2e;
+  }
+
+  /* ===== 顶部标题栏 ===== */
+  .titlebar {
+    height: 52px; background: #fff; border-bottom: 1px solid #e5e5e5;
+    display: flex; align-items: center; padding: 0 20px; gap: 12px;
+    flex-shrink: 0;
+  }
+  .titlebar .project-name { font-weight: 700; font-size: 15px; }
+  .titlebar .mode-badge {
+    font-size: 11px; padding: 3px 10px; border-radius: 20px;
+    background: #eef0ff; color: #6366f1; font-weight: 600;
+  }
+
+  /* ===== 左右分栏 ===== */
+  .main-area {
+    flex: 1; display: flex; overflow: hidden; padding: 8px; gap: 8px;
+  }
+
+  /* ===== 左侧对话区 ===== */
+  .chat-panel {
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .chat-header {
+    padding: 14px 20px; border-bottom: 1px solid #f0f0f0;
+    font-size: 14px; font-weight: 600; color: #666;
+  }
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 20px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .msg-system {
+    align-self: flex-start; max-width: 80%; background: #f8f9ff;
+    border-radius: 14px; padding: 14px 18px; font-size: 14px;
+    line-height: 1.6; border: 1px solid #e8e9ff;
+  }
+  .msg-system .role { font-size: 11px; color: #6366f1; margin-bottom: 4px; font-weight: 600; }
+  .msg-user {
+    align-self: flex-end; max-width: 70%; background: #6366f1; color: #fff;
+    border-radius: 14px; padding: 12px 16px; font-size: 14px; line-height: 1.5;
+  }
+  .card-options {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;
+  }
+  .card-options button {
+    padding: 8px 16px; border: 2px solid #d0d2ff; border-radius: 10px;
+    background: #fff; color: #6366f1; cursor: pointer; font-size: 13px;
+    font-weight: 500; transition: all 0.2s;
+  }
+  .card-options button:hover { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+  .chat-input-area {
+    padding: 14px 20px; border-top: 1px solid #f0f0f0; display: flex; gap: 10px;
+  }
+  .chat-input-area input {
+    flex: 1; padding: 12px 16px; border: 2px solid #e5e5e5; border-radius: 12px;
+    font-size: 14px; outline: none; transition: border-color 0.2s;
+  }
+  .chat-input-area input:focus { border-color: #6366f1; }
+  .chat-input-area button {
+    padding: 12px 22px; background: #6366f1; color: #fff; border: none;
+    border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .chat-input-area button:hover { background: #4f46e5; }
+
+  /* ===== 右侧预览区 ===== */
+  .preview-panel {
+    width: 440px; flex-shrink: 0; display: flex; flex-direction: column;
+    background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    overflow: hidden; position: relative;
+  }
+  .preview-header {
+    padding: 12px 16px; border-bottom: 1px solid #f0f0f0;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; font-weight: 600; color: #666; background: #fafafa;
+  }
+  .preview-header .status { display: flex; align-items: center; gap: 6px; }
+  .preview-header .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+  .preview-frame {
+    flex: 1; min-height: 0;
+  }
+  .preview-frame iframe {
+    width: 100%; height: 100%; border: none;
+  }
+
+  /* ===== 纠错弹窗（浮在预览区上方） ===== */
+  .correction-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.35);
+    display: none; align-items: center; justify-content: center;
+    z-index: 10; border-radius: 16px;
+  }
+  .correction-overlay.active { display: flex; }
+
+  .correction-popup {
+    background: #fff; border-radius: 16px; padding: 24px; width: 320px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2); position: relative;
+    animation: popup-in 0.2s ease-out;
+  }
+  @keyframes popup-in {
+    from { opacity: 0; transform: scale(0.9) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .correction-popup .close-btn {
+    position: absolute; top: 12px; right: 12px;
+    width: 28px; height: 28px; border: none; background: #f0f0f0;
+    border-radius: 50%; font-size: 16px; color: #888; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .correction-popup .close-btn:hover { background: #e0e0e0; color: #333; }
+  .correction-popup .title {
+    font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px;
+  }
+  .correction-popup .subtitle {
+    font-size: 12px; color: #999; margin-bottom: 16px; line-height: 1.5;
+  }
+  .correction-popup textarea {
+    width: 100%; height: 72px; padding: 10px 12px; border: 2px solid #e5e5e5;
+    border-radius: 10px; font-size: 13px; resize: none; outline: none;
+    font-family: inherit; transition: border-color 0.2s; margin-bottom: 14px;
+  }
+  .correction-popup textarea:focus { border-color: #6366f1; }
+  .correction-popup .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+  .correction-popup .btn-row button {
+    padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .correction-popup .btn-guess {
+    background: transparent; color: #888; border: 1px solid #e0e0e0;
+  }
+  .correction-popup .btn-guess:hover { background: #f5f5f5; color: #555; }
+  .correction-popup .btn-submit {
+    background: #6366f1; color: #fff; border: none;
+  }
+  .correction-popup .btn-submit:hover { background: #4f46e5; }
+
+  /* 点击元素信息展示 */
+  .correction-popup .element-info {
+    font-size: 11px; color: #aaa; margin-bottom: 12px; padding: 6px 10px;
+    background: #fafafa; border-radius: 6px; word-break: break-all;
+  }
+
+  /* ===== 底部时间轴 ===== */
+  .timeline {
+    height: 48px; background: #fff; border-top: 1px solid #e5e5e5;
+    display: flex; align-items: center; padding: 0 20px; gap: 8px;
+    flex-shrink: 0; font-size: 12px; color: #888;
+  }
+  .timeline .node {
+    padding: 6px 14px; background: #f5f5f5; border-radius: 8px;
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .timeline .node:hover { background: #eef0ff; }
+  .timeline .node.active { background: #6366f1; color: #fff; }
+  .timeline .arrow { color: #ccc; }
+</style>
+</head>
+<body>
+
+<!-- 顶部栏 -->
+<div class="titlebar">
+  <span class="project-name">💰 记账应用</span>
+  <span class="mode-badge">快消型</span>
+</div>
+
+<!-- 左右分栏 -->
+<div class="main-area">
+  <!-- 左侧：对话区 -->
+  <div class="chat-panel">
+    <div class="chat-header">💬 对话</div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg-system">
+        <div class="role">🤖 向导 Agent</div>
+        你好！你想做什么？告诉我你的想法，我帮你实现。
+      </div>
+      <div class="msg-user">帮我做一个日常记账应用</div>
+      <div class="msg-system">
+        <div class="role">🤖 向导 Agent</div>
+        明白了。主要记录什么类型的开销？
+        <div class="card-options">
+          <button>🍜 日常开销</button>
+          <button>💼 生意账目</button>
+          <button>✨ 你帮我决定</button>
+        </div>
+      </div>
+      <div class="msg-user">日常开销</div>
+      <div class="msg-system">
+        <div class="role">🤖 向导 Agent</div>
+        好的，让我先生成一个草图给你看看方向对不对……右边已经可以看到预览了。<br>
+        <span style="font-size:12px;color:#888;">💡 试试点击右侧预览中的任意元素，告诉我哪里不满意。</span>
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" placeholder="输入你的需求..." id="chatInput">
+      <button onclick="sendFeedback()">发送</button>
+    </div>
+  </div>
+
+  <!-- 右侧：预览区 -->
+  <div class="preview-panel" id="previewPanel">
+    <div class="preview-header">
+      <div class="status">
+        <span class="dot"></span>
+        <span>预览</span>
+      </div>
+      <span style="font-size:11px;color:#999;display:flex;align-items:center;gap:4px;">
+        🖱 点击元素纠错&nbsp;<span style="color:#6366f1;">●</span>
+      </span>
+    </div>
+    <div class="preview-frame">
+      <iframe
+        id="previewIframe"
+        sandbox="allow-scripts allow-same-origin"
+        srcdoc="<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<meta charset='UTF-8'>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f5;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100vh; padding: 20px;
+    cursor: default;
+  }
+  /* 进入纠错模式：所有元素可点 */
+  body.correction-mode * { cursor: pointer; }
+  body.correction-mode *:hover { outline: 2px dashed #6366f1; outline-offset: 2px; }
+  /* 高亮动画 */
+  .wizard-highlight {
+    outline: 3px solid #ef4444 !important;
+    outline-offset: 3px;
+    animation: wizard-pulse 0.7s ease-in-out infinite alternate;
+  }
+  @keyframes wizard-pulse {
+    from { outline-color: #ef4444; outline-width: 3px; }
+    to   { outline-color: #f87171; outline-width: 4px; }
+  }
+  .card {
+    background: white; border-radius: 16px; padding: 32px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08); max-width: 420px; width: 100%;
+  }
+  h1 { font-size: 22px; color: #1a1a2e; margin-bottom: 20px; text-align: center; }
+  .input-group { display: flex; gap: 6px; margin-bottom: 16px; }
+  input {
+    flex: 1; padding: 10px 12px; border: 2px solid #e0e0e0;
+    border-radius: 10px; font-size: 14px; outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: #6366f1; }
+  button {
+    padding: 10px 18px; background: #6366f1; color: white;
+    border: none; border-radius: 10px; font-size: 14px; cursor: pointer;
+    font-weight: 600; transition: background 0.2s;
+  }
+  button:hover { background: #4f46e5; }
+  .record-list { list-style: none; }
+  .record-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: #f8f9ff; border-radius: 10px;
+    margin-bottom: 6px; font-size: 14px;
+  }
+  .record-list .amount { font-weight: 700; color: #6366f1; }
+  .record-list .category {
+    font-size: 11px; color: #888; background: #eef0ff;
+    padding: 2px 8px; border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class='card'>
+    <h1>💰 记账应用</h1>
+    <div class='input-group'>
+      <input type='text' placeholder='金额' id='amount' style='width:100px'>
+      <input type='text' placeholder='分类' id='category' style='width:120px'>
+      <button id='saveBtn'>保存</button>
+    </div>
+    <ul class='record-list' id='recordList'>
+      <li><span>🍜 午餐</span><span class='category'>餐饮</span><span class='amount'>¥30</span></li>
+      <li><span>🚇 地铁</span><span class='category'>交通</span><span class='amount'>¥15</span></li>
+      <li><span>☕ 咖啡</span><span class='category'>餐饮</span><span class='amount'>¥22</span></li>
+    </ul>
+  </div>
+  <script>
+    // === 点选纠错逻辑（接口 6：iframe → 主进程 postMessage）===
+    (function() {
+      var correctionEnabled = true
+      var highlighted = null
+
+      document.addEventListener('click', function(e) {
+        if (!correctionEnabled) return
+
+        // 输入框正常使用（不拦截），但输入框本身也可纠错
+        if (e.target.tagName === 'INPUT' && document.activeElement === e.target) return
+        if (e.target.tagName === 'TEXTAREA' && document.activeElement === e.target) return
+
+        e.stopPropagation()
+        e.preventDefault()
+
+        // 清除旧高亮
+        if (highlighted) highlighted.classList.remove('wizard-highlight')
+
+        // 新高亮
+        e.target.classList.add('wizard-highlight')
+        highlighted = e.target
+
+        var rect = e.target.getBoundingClientRect()
+        window.parent.postMessage({
+          type: 'element-clicked',
+          data: {
+            tag: e.target.tagName,
+            id: e.target.id || null,
+            className: e.target.className.replace('wizard-highlight','').trim(),
+            textContent: (e.target.textContent || '').trim().substring(0, 50),
+            rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+            parentTag: e.target.parentElement ? e.target.parentElement.tagName : null,
+            pageTitle: document.title || '记账应用',
+            nearbyText: (e.target.parentElement ? e.target.parentElement.textContent : '').trim().substring(0, 80)
+          }
+        }, '*')
+      }, true)
+
+      // 监听父页面发回的清除高亮指令
+      window.addEventListener('message', function(e) {
+        if (e.data === 'clear-highlight' && highlighted) {
+          highlighted.classList.remove('wizard-highlight')
+          highlighted = null
+        }
+      })
+    })()
+  </script>
+</body>
+</html>"
+        title="应用预览"
+      ></iframe>
+    </div>
+
+    <!-- 纠错弹窗 -->
+    <div class="correction-overlay" id="correctionOverlay">
+      <div class="correction-popup">
+        <button class="close-btn" title="关闭（就是不满意，你猜）" onclick="closeCorrection(null)">✕</button>
+        <div class="title">💬 这里有什么问题？</div>
+        <div class="subtitle">点击了 <strong id="clickedElement">—</strong></div>
+        <div class="element-info" id="elementDetail"></div>
+        <textarea
+          id="correctionInput"
+          placeholder="描述一下哪里不满意……&#10;比如：按钮太小了、颜色不好看、功能不对"
+        ></textarea>
+        <div class="btn-row">
+          <button class="btn-guess" onclick="closeCorrection(null)" title="不写反馈，让 AI 自己猜">😶 就是不满意，你猜</button>
+          <button class="btn-submit" onclick="submitCorrection()">✏️ 提交反馈</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部时间轴 -->
+<div class="timeline">
+  <span>⏱ 时间轴</span>
+  <span class="arrow">→</span>
+  <span class="node active">📐 验证草图 v1</span>
+  <span class="arrow">→</span>
+  <span class="node">🚀 MVP v1</span>
+  <span class="arrow">→</span>
+  <span class="node">📍 当前版本</span>
+  <span style="margin-left:auto;font-size:11px;color:#bbb;">点击任意节点一键回退</span>
+</div>
+
+<script>
+  // === 父页面：监听 iframe 的 postMessage（接口 6 → 接口 7 的 UI 部分）===
+  var lastClickData = null
+
+  window.addEventListener('message', function(e) {
+    if (!e.data || e.data.type !== 'element-clicked') return
+    lastClickData = e.data.data
+
+    // 显示弹窗
+    document.getElementById('clickedElement').textContent =
+      '「' + (e.data.data.textContent || e.data.data.tag) + '」'
+    document.getElementById('elementDetail').textContent =
+      '标签: <' + e.data.data.tag + '>  ·  ' +
+      (e.data.data.id ? 'id: ' + e.data.data.id + '  ·  ' : '') +
+      '尺寸: ' + e.data.data.rect.width + '×' + e.data.data.rect.height + 'px'
+    document.getElementById('correctionInput').value = ''
+    document.getElementById('correctionOverlay').classList.add('active')
+  })
+
+  // 关闭纠错弹窗
+  function closeCorrection(feedback) {
+    document.getElementById('correctionOverlay').classList.remove('active')
+    // 发送消息给 iframe 清除高亮
+    var iframe = document.getElementById('previewIframe')
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage('clear-highlight', '*')
+    }
+
+    // 模拟：反馈写入对话区
+    if (feedback !== undefined) {
+      addFeedbackToChat(feedback)
+    }
+    lastClickData = null
+  }
+
+  // 提交纠错反馈
+  function submitCorrection() {
+    var text = document.getElementById('correctionInput').value.trim()
+    if (!text) {
+      // 空提交 = "就是不满意，你猜"
+      closeCorrection(null)
+      addFeedbackToChat('（用户对「' + (lastClickData?.textContent || '某元素') + '」不满意，但没说具体原因）')
+      return
+    }
+    closeCorrection(text)
+  }
+
+  // 将反馈写入左侧对话
+  function addFeedbackToChat(text) {
+    var container = document.getElementById('chatMessages')
+    var div = document.createElement('div')
+    div.className = 'msg-user'
+    div.style.background = '#f59e0b'
+    div.textContent = '🔧 纠错反馈: ' + text
+    container.appendChild(div)
+
+    // 模拟向导 Agent 回复
+    setTimeout(function() {
+      var reply = document.createElement('div')
+      reply.className = 'msg-system'
+      reply.innerHTML = '<div class="role">🤖 向导 Agent</div>收到，正在根据你的反馈修改……改好了，你看看右边效果？'
+      container.appendChild(reply)
+      container.scrollTop = container.scrollHeight
+    }, 600)
+    container.scrollTop = container.scrollHeight
+  }
+
+  // 普通消息发送
+  function sendFeedback() {
+    var input = document.getElementById('chatInput')
+    var text = input.value.trim()
+    if (!text) return
+
+    var container = document.getElementById('chatMessages')
+    var div = document.createElement('div')
+    div.className = 'msg-user'
+    div.textContent = text
+    container.appendChild(div)
+    input.value = ''
+    container.scrollTop = container.scrollHeight
+  }
+</script>
+
+</body>
+</html>
